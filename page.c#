@@ -44,25 +44,31 @@ namespace InvesAc.Backend
         public CalculadoraInvestimentoService(decimal saldoInicial = 150000m)
         {
             _saldoAtual = saldoInicial;
+
             _extrato = new List<Transacao>
             {
-                new Transacao 
-                { 
+                new Transacao
+                {
                     Id = Guid.NewGuid().ToString(),
-                    Tipo = "aporte", 
-                    Valor = saldoInicial, 
+                    Tipo = "aporte",
+                    Valor = saldoInicial,
                     Data = DateTime.Now.AddDays(-30),
                     Descricao = "Aporte Inicial"
                 }
             };
         }
-     // 1. Cálculo de Valor Futuro (Rentabilidade)
-        public ResultadoVF CalcularValorFuturo(decimal aporteInicial, decimal aporteMensal, decimal taxaMensalPercentual, int meses)
+
+        // 1. Cálculo de Valor Futuro (Rentabilidade)
+        public ResultadoVF CalcularValorFuturo(
+            decimal aporteInicial,
+            decimal aporteMensal,
+            decimal taxaMensalPercentual,
+            int meses)
         {
             decimal taxaDecimal = taxaMensalPercentual / 100m;
             decimal totalAtual = aporteInicial;
-            
-            var pontosGrafico = new List<PontoGraficoVF>();
+
+            List<PontoGraficoVF> pontosGrafico = new List<PontoGraficoVF>();
 
             for (int i = 0; i <= meses; i++)
             {
@@ -70,11 +76,11 @@ namespace InvesAc.Backend
                 {
                     totalAtual = (totalAtual * (1 + taxaDecimal)) + aporteMensal;
                 }
-                
-                pontosGrafico.Add(new PontoGraficoVF 
-                { 
-                    Mes = $"Mês {i}", 
-                    Valor = Math.Round(totalAtual, 2) 
+
+                pontosGrafico.Add(new PontoGraficoVF
+                {
+                    Mes = $"Mês {i}",
+                    Valor = Math.Round(totalAtual, 2)
                 });
             }
 
@@ -86,37 +92,47 @@ namespace InvesAc.Backend
         }
 
         // 2. Cálculo de Valor Presente (Financiamento)
-        public decimal CalcularValorPresente(decimal valorParcela, decimal taxaMensalPercentual, int meses)
+        public decimal CalcularValorPresente(
+            decimal valorParcela,
+            decimal taxaMensalPercentual,
+            int meses)
         {
-            if (taxaMensalPercentual <= 0 || meses <= 0) return 0m;
+            if (taxaMensalPercentual <= 0 || meses <= 0)
+            {
+                return 0m;
+            }
 
-            // Fórmula VP = PMT * ((1 - (1 + i)^-n) / i)
             double taxaDouble = (double)(taxaMensalPercentual / 100m);
             double parcelaDouble = (double)valorParcela;
-            
-            double vp = parcelaDouble * ((1.0 - Math.Pow(1.0 + taxaDouble, -meses)) / taxaDouble);
-            
+
+            double vp = parcelaDouble *
+                        ((1.0 - Math.Pow(1.0 + taxaDouble, -meses))
+                        / taxaDouble);
+
             return Math.Round((decimal)vp, 2);
         }
 
         // 3. Cálculo de Valor do Imóvel
-        public decimal CalcularValorImovel(string regiao, decimal metrosQuadrados)
+        public decimal CalcularValorImovel(
+            string regiao,
+            decimal metrosQuadrados)
         {
             string key = regiao.ToLower();
+
             if (_precosRegiao.ContainsKey(key))
             {
                 return _precosRegiao[key] * metrosQuadrados;
             }
+
             return 0m;
         }
 
-        
         // 4. Lógica de Resgate e Extrato
         public bool RealizarResgate(decimal valor)
         {
             if (valor <= 0 || valor > _saldoAtual)
             {
-                return false; // Saldo insuficiente ou valor inválido
+                return false;
             }
 
             _saldoAtual -= valor;
@@ -133,8 +149,50 @@ namespace InvesAc.Backend
             return true;
         }
 
-        public decimal ObterSaldo() => _saldoAtual;
-        
-        public List<Transacao> ObterExtrato() => _extrato;
+        public decimal ObterSaldo()
+        {
+            return _saldoAtual;
+        }
+
+        public List<Transacao> ObterExtrato()
+        {
+            return _extrato;
+        }
+    }
+
+    // Classe principal da aplicação
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            CalculadoraInvestimentoService calculadora =
+                new CalculadoraInvestimentoService();
+
+            Console.WriteLine("=== TESTE DA CALCULADORA ===");
+
+            ResultadoVF resultado = calculadora.CalcularValorFuturo(
+                10000m,
+                500m,
+                1m,
+                12
+            );
+
+            Console.WriteLine(
+                "Valor Futuro após 12 meses: R$ " +
+                resultado.ValorFinal.ToString("F2"));
+
+            decimal valorImovel =
+                calculadora.CalcularValorImovel("sul", 100);
+
+            Console.WriteLine(
+                "Valor do imóvel: R$ " +
+                valorImovel.ToString("F2"));
+
+            Console.WriteLine(
+                "Saldo atual: R$ " +
+                calculadora.ObterSaldo().ToString("F2"));
+
+            Console.ReadKey();
+        }
     }
 }
