@@ -1,0 +1,140 @@
+using System;
+using System.Collections.Generic;
+
+namespace InvesAc.Backend
+{
+    // Modelos para a listagem e histórico
+    public class Transacao
+    {
+        public string Id { get; set; }
+        public string Tipo { get; set; } // "aporte" ou "resgate"
+        public decimal Valor { get; set; }
+        public DateTime Data { get; set; }
+        public string Descricao { get; set; }
+    }
+
+    public class PontoGraficoVF
+    {
+        public string Mes { get; set; }
+        public decimal Valor { get; set; }
+    }
+
+    public class ResultadoVF
+    {
+        public decimal ValorFinal { get; set; }
+        public List<PontoGraficoVF> DadosGrafico { get; set; }
+    }
+
+    // Serviço principal de cálculos
+    public class CalculadoraInvestimentoService
+    {
+        private decimal _saldoAtual;
+        private List<Transacao> _extrato;
+
+        // Dicionário simulando banco de dados de preços de imóveis
+        private readonly Dictionary<string, decimal> _precosRegiao = new Dictionary<string, decimal>
+        {
+            { "centro", 9500m },
+            { "sul", 12000m },
+            { "norte", 6500m },
+            { "leste", 7500m },
+            { "oeste", 8000m }
+        };
+
+        public CalculadoraInvestimentoService(decimal saldoInicial = 150000m)
+        {
+            _saldoAtual = saldoInicial;
+            _extrato = new List<Transacao>
+            {
+                new Transacao 
+                { 
+                    Id = Guid.NewGuid().ToString(),
+                    Tipo = "aporte", 
+                    Valor = saldoInicial, 
+                    Data = DateTime.Now.AddDays(-30),
+                    Descricao = "Aporte Inicial"
+                }
+            };
+        }
+     // 1. Cálculo de Valor Futuro (Rentabilidade)
+        public ResultadoVF CalcularValorFuturo(decimal aporteInicial, decimal aporteMensal, decimal taxaMensalPercentual, int meses)
+        {
+            decimal taxaDecimal = taxaMensalPercentual / 100m;
+            decimal totalAtual = aporteInicial;
+            
+            var pontosGrafico = new List<PontoGraficoVF>();
+
+            for (int i = 0; i <= meses; i++)
+            {
+                if (i > 0)
+                {
+                    totalAtual = (totalAtual * (1 + taxaDecimal)) + aporteMensal;
+                }
+                
+                pontosGrafico.Add(new PontoGraficoVF 
+                { 
+                    Mes = $"Mês {i}", 
+                    Valor = Math.Round(totalAtual, 2) 
+                });
+            }
+
+            return new ResultadoVF
+            {
+                ValorFinal = Math.Round(totalAtual, 2),
+                DadosGrafico = pontosGrafico
+            };
+        }
+
+        // 2. Cálculo de Valor Presente (Financiamento)
+        public decimal CalcularValorPresente(decimal valorParcela, decimal taxaMensalPercentual, int meses)
+        {
+            if (taxaMensalPercentual <= 0 || meses <= 0) return 0m;
+
+            // Fórmula VP = PMT * ((1 - (1 + i)^-n) / i)
+            double taxaDouble = (double)(taxaMensalPercentual / 100m);
+            double parcelaDouble = (double)valorParcela;
+            
+            double vp = parcelaDouble * ((1.0 - Math.Pow(1.0 + taxaDouble, -meses)) / taxaDouble);
+            
+            return Math.Round((decimal)vp, 2);
+        }
+
+        // 3. Cálculo de Valor do Imóvel
+        public decimal CalcularValorImovel(string regiao, decimal metrosQuadrados)
+        {
+            string key = regiao.ToLower();
+            if (_precosRegiao.ContainsKey(key))
+            {
+                return _precosRegiao[key] * metrosQuadrados;
+            }
+            return 0m;
+        }
+
+        
+        // 4. Lógica de Resgate e Extrato
+        public bool RealizarResgate(decimal valor)
+        {
+            if (valor <= 0 || valor > _saldoAtual)
+            {
+                return false; // Saldo insuficiente ou valor inválido
+            }
+
+            _saldoAtual -= valor;
+
+            _extrato.Insert(0, new Transacao
+            {
+                Id = Guid.NewGuid().ToString(),
+                Tipo = "resgate",
+                Valor = Math.Round(valor, 2),
+                Data = DateTime.Now,
+                Descricao = "Resgate de Investimento"
+            });
+
+            return true;
+        }
+
+        public decimal ObterSaldo() => _saldoAtual;
+        
+        public List<Transacao> ObterExtrato() => _extrato;
+    }
+}
